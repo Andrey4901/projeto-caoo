@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
 
 class SistemaView:
     def __init__(self, root, controller):
@@ -14,18 +17,18 @@ class SistemaView:
 
         # Define os frames que AINDA vamos usar
         self.frames = {}
-        for nome in ["menu_jogadores", "cadastro_jogador", "listar_jogadores", "analise_kmeans"]:
+        for nome in ["menu_jogadores", "cadastro_jogador", "listar_jogadores", "analise_kmeans", "detalhes_jogador"]:
             frame = tk.Frame(root, bg="#222")
             frame.place(relx=0, rely=0, relwidth=1, relheight=1)
             self.frames[nome] = frame
-
-        # Cria as telas
+        
+        # ... (suas chamadas de telas) ...
         self.tela_menu_jogadores()
         self.tela_cadastro_jogador()
         self.tela_listar_jogadores()
         self.tela_analise_kmeans()
+        self.tela_detalhes_jogador() # <--- Adicione a chamada para criar a nova tela vazia
 
-        # Define a tela inicial diretamente como o menu de jogadores
         self.mostrar_frame("menu_jogadores")
 
     def mostrar_frame(self, nome):
@@ -141,19 +144,28 @@ class SistemaView:
         frame = self.frames["listar_jogadores"]
         tk.Label(frame, text="Base de Dados de Jogadores", bg="#222", fg="white", font=("Arial", 16)).pack(pady=10)
 
-        # Frame para a tabela e scrollbar
+        # Frame para a tabela
         tree_frame = tk.Frame(frame)
         tree_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
         scroll = ttk.Scrollbar(tree_frame)
         scroll.pack(side="right", fill="y")
 
-        # Tabela
         self.tree_lista = ttk.Treeview(tree_frame, yscrollcommand=scroll.set, selectmode="browse")
         self.tree_lista.pack(fill="both", expand=True)
         scroll.config(command=self.tree_lista.yview)
 
-        tk.Button(frame, text="Voltar", width=12, command=lambda: self.mostrar_frame("menu_jogadores")).pack(pady=10)
+        # --- ÁREA DOS BOTÕES (RODAPÉ) ---
+        botoes_frame = tk.Frame(frame, bg="#222")
+        botoes_frame.pack(pady=15)
+
+        # Botão Voltar
+        tk.Button(botoes_frame, text="Voltar", width=12, 
+                  command=lambda: self.mostrar_frame("menu_jogadores")).pack(side="left", padx=10)
+        
+        # Botão Selecionar (Novo!)
+        tk.Button(botoes_frame, text="Selecionar", width=12, bg="#4CAF50", fg="white",
+                  command=self.selecionar_jogador_da_lista).pack(side="left", padx=10)
 
     def exibir_lista_jogadores(self):
         # Pega a lista atualizada do controller
@@ -191,48 +203,206 @@ class SistemaView:
     # -------- Telas de Análise (NOVA SEÇÃO) --------
     def tela_analise_kmeans(self):
         frame = self.frames["analise_kmeans"]
-        tk.Label(frame, text="Análise de Perfis de Jogadores (K-Means)", bg="#222", fg="white", font=("Arial", 16)).pack(pady=10)
+        
+        # Título
+        tk.Label(frame, text="Análise de Perfis (Comparativo com Referência)", bg="#222", fg="white", font=("Arial", 16)).pack(pady=10)
 
-        # Frame para a tabela
-        tree_frame = tk.Frame(frame)
-        tree_frame.pack(pady=10, padx=10, fill="both", expand=True)
+        # Área onde o gráfico vai ficar
+        self.frame_grafico = tk.Frame(frame, bg="white") # Fundo branco pro gráfico
+        self.frame_grafico.pack(pady=10, padx=10, fill="both", expand=True)
 
-        # Scrollbar
-        scroll = ttk.Scrollbar(tree_frame)
-        scroll.pack(side="right", fill="y")
-
-        # O Treeview é a nossa tabela
-        self.tree_kmeans = ttk.Treeview(tree_frame, yscrollcommand=scroll.set, selectmode="extended")
-        self.tree_kmeans.pack(fill="both", expand=True)
-        scroll.config(command=self.tree_kmeans.yview)
-
-        tk.Button(frame, text="Voltar", width=12, command=lambda: self.mostrar_frame("menu_jogadores")).pack(pady=10)
-
+        # Botões
+        botoes = tk.Frame(frame, bg="#222")
+        botoes.pack(pady=10)
+        
+        tk.Button(botoes, text="Atualizar Análise", width=15, command=self.exibir_analise_kmeans).pack(side="left", padx=10)
+        tk.Button(botoes, text="Voltar", width=15, command=lambda: self.mostrar_frame("menu_jogadores")).pack(side="left", padx=10)
 
     def exibir_analise_kmeans(self):
-        # Chama o controller para obter os dados analisados
-        resultados_df = self.controller.analisar_perfis_kmeans()
+        # 1. Primeiro, muda para a tela de análise para o usuário ver que algo está acontecendo
+        self.mostrar_frame("analise_kmeans")
 
-        if resultados_df is None:
-            messagebox.showwarning("Atenção", "Não há dados suficientes ou válidos para realizar a análise.")
+        # 2. Limpa o gráfico antigo se houver (para não sobrepor)
+        for widget in self.frame_grafico.winfo_children():
+            widget.destroy()
+
+        # 3. Chama o controller para processar os dados
+        # Se houver erro, 'df_resultado' será None e 'msg' terá o motivo
+        df_resultado, msg = self.controller.gerar_analise_grafica()
+
+        if df_resultado is None:
+            # Mostra o erro na tela (ex: "Sem dados suficientes")
+            lbl_erro = tk.Label(self.frame_grafico, text=f"Não foi possível gerar o gráfico:\n{msg}", 
+                                bg="white", fg="red", font=("Arial", 12))
+            lbl_erro.pack(pady=50)
             return
         
-        # Limpa a tabela antiga
-        for i in self.tree_kmeans.get_children():
-            self.tree_kmeans.delete(i)
-
-        # Define as colunas da tabela
-        self.tree_kmeans['columns'] = list(resultados_df.columns)
-        self.tree_kmeans.column("#0", width=0, stretch=tk.NO)
-        self.tree_kmeans.heading("#0", text="", anchor=tk.CENTER)
-
-        for col in self.tree_kmeans['columns']:
-            self.tree_kmeans.column(col, anchor=tk.CENTER, width=80)
-            self.tree_kmeans.heading(col, text=col, anchor=tk.CENTER)
+    # -------- Lógica de Seleção --------
+    def selecionar_jogador_da_lista(self):
+        # 1. Verifica qual item está selecionado na tabela
+        item_selecionado = self.tree_lista.selection()
         
-        # Adiciona os dados na tabela
-        for index, row in resultados_df.iterrows():
-            self.tree_kmeans.insert(parent="", index="end", iid=index, text="", values=list(row))
+        if not item_selecionado:
+            messagebox.showwarning("Atenção", "Por favor, clique em um jogador da lista para selecionar.")
+            return
+
+        # 2. Pega os valores da linha selecionada
+        # (Isso retorna uma lista: [Nome, Data, Peso, ...])
+        valores = self.tree_lista.item(item_selecionado, "values")
+        
+        # 3. Chama a nova tela passando esses dados
+        self.abrir_tela_detalhes(valores)
+
+    def abrir_tela_detalhes(self, valores_treeview):
+        # 1. Chama o controller
+        resultado, msg = self.controller.obter_detalhes_e_predicao(valores_treeview)
+        
+        if resultado is None:
+            messagebox.showerror("Erro", f"Não foi possível ler os dados do atleta.\n{msg}")
+            return
+
+        atleta = resultado['atleta']
+        posicao = resultado['melhor_posicao']
+        dados_graf = resultado['dados_grafico']
+
+        # 2. Configura a tela
+        frame = self.frames["detalhes_jogador"]
+        
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        # --- CABEÇALHO ---
+        lbl_titulo = tk.Label(frame, text=f"Seu perfil é de:  [{posicao}]", 
+                              bg="#222", fg="white", font=("Arial", 22, "bold"))
+        lbl_titulo.pack(side="top", pady=(20, 10))
+
+        # --- RODAPÉ (Botão Retornar) ---
+        btn_frame = tk.Frame(frame, bg="#222")
+        btn_frame.pack(side="bottom", fill="x", pady=20)
+        
+        tk.Button(btn_frame, text="Retornar", width=15, height=2, bg="#ddd", font=("Arial", 11),
+                  command=lambda: self.mostrar_frame("listar_jogadores")).pack()
+
+        # --- ÁREA DE CONTEÚDO ---
+        conteudo = tk.Frame(frame, bg="#222")
+        conteudo.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+
+        # >>> LADO ESQUERDO: TEXTO <<<
+        frame_texto = tk.Frame(conteudo, bg="#e0e0e0", bd=2, relief="ridge")
+        frame_texto.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        tk.Label(frame_texto, text="Dados do atleta:", bg="#d0d0d0", fg="black", font=("Arial", 14)).pack(fill="x", pady=5)
+
+        # --- FUNÇÃO AUXILIAR DE FORMATAÇÃO PARA VIEW ---
+        # Garante que, se for número, vira inteiro visualmente.
+        def fmt(valor):
+            try:
+                return int(round(float(valor)))
+            except (ValueError, TypeError):
+                return valor
+
+        dados_exibir = [
+            ("Nome:", atleta["Nome"]),
+            ("Data de nascimento:", atleta["Data_formatada"]),
+            ("Peso:", f"{fmt(atleta['peso'])} kg"),
+            ("Estatura:", f"{fmt(atleta['estatura'])} cm"),
+            ("Flexibilidade:", f"{fmt(atleta['flexibilidade'])} cm"),
+            ("Abdominal:", f"{fmt(atleta['abdominal'])} rep"),
+            ("Arremesso:", f"{fmt(atleta['arremesso'])} m"),
+            ("Salto horizontal:", f"{fmt(atleta['Salto horizontal'])} cm"),
+            ("Salto Vertical:", f"{fmt(atleta['Salto vertical'])} cm"),
+        ]
+
+        for rotulo, valor in dados_exibir:
+            f_linha = tk.Frame(frame_texto, bg="#e0e0e0")
+            f_linha.pack(fill="x", pady=5, padx=15)
             
-        # Mostra a tela com os resultados
-        self.mostrar_frame("analise_kmeans")
+            tk.Label(f_linha, text=rotulo, bg="#e0e0e0", fg="black", font=("Arial", 12), anchor="w").pack(side="left")
+            tk.Label(f_linha, text=valor, bg="#e0e0e0", fg="black", font=("Arial", 12, "bold"), anchor="e").pack(side="right")
+
+        # >>> LADO DIREITO: GRÁFICO RADAR <<<
+        frame_grafico = tk.Frame(conteudo, bg="white", bd=2, relief="ridge")
+        frame_grafico.pack(side="right", fill="both", expand=True, padx=(10, 0))
+
+        self.desenhar_radar(frame_grafico, dados_graf, posicao)
+
+        self.mostrar_frame("detalhes_jogador")
+
+    def desenhar_radar(self, parent_frame, dados, posicao_nome):
+        # Configuração dos dados para o radar fechar o círculo
+        labels = dados['labels']
+        values = dados['values_atleta']
+        
+        # O Matplotlib precisa que o primeiro ponto seja repetido no final para fechar a linha
+        values += values[:1]
+        
+        # Calcula os ângulos para cada atributo
+        angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+        angles += angles[:1] # Repete o primeiro ângulo
+
+        # Cria a figura
+        fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+        
+        # Desenha a linha e preenche
+        ax.plot(angles, values, color='#1f77b4', linewidth=2)
+        ax.fill(angles, values, color='#1f77b4', alpha=0.25)
+        
+        # Configura os rótulos (Labels)
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(labels, fontsize=9)
+        
+        # Remove os valores do eixo Y (círculos concêntricos) para ficar mais limpo
+        ax.set_yticklabels([])
+        ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0]) # Define grades fixas
+        ax.set_ylim(0, 1) # Limite de 0 a 100% (devido à nossa normalização)
+
+        ax.set_title(f"Performance vs Ideal", y=1.08, fontsize=10, color="#555")
+
+        # Coloca no Tkinter
+        canvas = FigureCanvasTkAgg(fig, master=parent_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    # Apenas para o Python não reclamar na inicialização, crie o esqueleto inicial
+    def tela_detalhes_jogador(self):
+        pass
+
+        # --- CRIANDO O GRÁFICO COM MATPLOTLIB ---
+        try:
+            fig, ax = plt.subplots(figsize=(8, 5), dpi=100)
+            
+            # Separa atletas e referências
+            atletas = df_resultado[df_resultado['Tipo'] == 'Atleta']
+            referencias = df_resultado[df_resultado['Tipo'] == 'Referencia']
+
+            # Plota os Atletas (Bolinhas)
+            # 'c' define a cor baseada no Cluster, 'cmap' é a paleta de cores
+            ax.scatter(atletas['PCA1'], atletas['PCA2'], c=atletas['Cluster'], cmap='viridis', s=100, alpha=0.7, label='Atletas')
+            
+            # Plota as Referências (Estrelas Vermelhas Grandes)
+            ax.scatter(referencias['PCA1'], referencias['PCA2'], c='red', marker='*', s=300, label='Padrão (Ref)')
+
+            # Coloca os nomes nos pontos
+            for i, row in df_resultado.iterrows():
+                # Se for referência, coloca o nome da posição em negrito
+                if row['Tipo'] == 'Referencia':
+                    # Ajuste fino na posição do texto (+0.1) para não ficar em cima do ponto
+                    ax.text(row['PCA1'], row['PCA2']+0.1, row['Nome'].replace("REF: ", ""), fontsize=9, fontweight='bold', color='darkred')
+                else:
+                    # Se for atleta, coloca o nome menorzinho
+                    ax.text(row['PCA1'], row['PCA2']+0.1, row['Nome'], fontsize=8)
+
+            ax.set_title('Mapa de Perfis (Atletas vs Padrão Polo Aquático)')
+            ax.set_xlabel('Dimensão 1 (PCA)')
+            ax.set_ylabel('Dimensão 2 (PCA)')
+            ax.grid(True, linestyle='--', alpha=0.5)
+            ax.legend()
+
+            # Coloca o gráfico no Tkinter
+            canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill="both", expand=True)
+            
+        except Exception as e:
+            # Caso o matplotlib falhe por algum motivo
+            tk.Label(self.frame_grafico, text=f"Erro ao desenhar gráfico: {e}", fg="red").pack()

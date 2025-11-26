@@ -328,5 +328,16 @@
         "arremesso": 100.0,
         "Salto horizontal": 100.0,
         "Salto vertical": 100.0
+    },
+    {
+        "Nome": "Dalka Neko",
+        "Data nasc": "01/01/1500",
+        "peso": 110.0,
+        "estatura": 209.0,
+        "flexibilidade": 99.0,
+        "abdominal": 80.0,
+        "arremesso": 350.0,
+        "Salto horizontal": 30.0,
+        "Salto vertical": 40.0
     }
 ]
