@@ -297,17 +297,6 @@
         "Salto vertical": 30.0
     },
     {
-        "Nome": "Tururu",
-        "Data nasc": "01-01-1989",
-        "peso": 98.0,
-        "estatura": 206.0,
-        "flexibilidade": 90.0,
-        "abdominal": 79.0,
-        "arremesso": 9.0,
-        "Salto horizontal": 201.0,
-        "Salto vertical": 36.0
-    },
-    {
         "Nome": "Katukaku",
         "Data nasc": "01-01-1969",
         "peso": 130.0,
@@ -339,5 +328,115 @@
         "arremesso": 350.0,
         "Salto horizontal": 30.0,
         "Salto vertical": 40.0
+    },
+    {
+        "Nome": "Thor Odinson",
+        "Data nasc": "15/05/1995",
+        "peso": 118.0,
+        "estatura": 202.0,
+        "flexibilidade": 55.0,
+        "abdominal": 60.0,
+        "arremesso": 12.0,
+        "Salto horizontal": 165.0,
+        "Salto vertical": 65.0
+    },
+    {
+        "Nome": "Natasha Romanoff",
+        "Data nasc": "22/11/1998",
+        "peso": 62.0,
+        "estatura": 168.0,
+        "flexibilidade": 85.0,
+        "abdominal": 55.0,
+        "arremesso": 6.5,
+        "Salto horizontal": 240.0,
+        "Salto vertical": 50.0
+    },
+    {
+        "Nome": "Clark Kent",
+        "Data nasc": "18/06/1990",
+        "peso": 95.0,
+        "estatura": 195.0,
+        "flexibilidade": 70.0,
+        "abdominal": 60.0,
+        "arremesso": 6.0,
+        "Salto horizontal": 185.0,
+        "Salto vertical": 85.0
+    },
+    {
+        "Nome": "Diana Prince",
+        "Data nasc": "22/03/1994",
+        "peso": 88.0,
+        "estatura": 188.0,
+        "flexibilidade": 75.0,
+        "abdominal": 80.0,
+        "arremesso": 9.0,
+        "Salto horizontal": 195.0,
+        "Salto vertical": 60.0
+    },
+    {
+        "Nome": "Barry Allen",
+        "Data nasc": "14/09/2000",
+        "peso": 74.0,
+        "estatura": 178.0,
+        "flexibilidade": 60.0,
+        "abdominal": 50.0,
+        "arremesso": 7.0,
+        "Salto horizontal": 255.0,
+        "Salto vertical": 55.0
+    },
+    {
+        "Nome": "Bruce Banner",
+        "Data nasc": "10/10/1985",
+        "peso": 105.0,
+        "estatura": 190.0,
+        "flexibilidade": 50.0,
+        "abdominal": 75.0,
+        "arremesso": 9.5,
+        "Salto horizontal": 170.0,
+        "Salto vertical": 50.0
+    },
+    {
+        "Nome": "Wanda Maximoff",
+        "Data nasc": "01/02/2001",
+        "peso": 78.0,
+        "estatura": 182.0,
+        "flexibilidade": 80.0,
+        "abdominal": 45.0,
+        "arremesso": 5.5,
+        "Salto horizontal": 175.0,
+        "Salto vertical": 72.0
+    },
+    {
+        "Nome": "Arthur Curry",
+        "Data nasc": "29/01/1992",
+        "peso": 90.0,
+        "estatura": 192.0,
+        "flexibilidade": 65.0,
+        "abdominal": 65.0,
+        "arremesso": 8.0,
+        "Salto horizontal": 215.0,
+        "Salto vertical": 55.0
+    },
+    {
+        "Nome": "Carol Danvers",
+        "Data nasc": "15/07/1996",
+        "peso": 70.0,
+        "estatura": 175.0,
+        "flexibilidade": 60.0,
+        "abdominal": 70.0,
+        "arremesso": 7.8,
+        "Salto horizontal": 200.0,
+        "Salto vertical": 58.0
+    },
+    {
+        "Nome": "Victor Stone",
+        "Data nasc": "05/05/2002",
+        "peso": 98.0,
+        "estatura": 194.0,
+        "flexibilidade": 40.0,
+        "abdominal": 85.0,
+        "arremesso": 8.5,
+        "Salto horizontal": 180.0,
+        "Salto vertical": 45.0
     }
 ]

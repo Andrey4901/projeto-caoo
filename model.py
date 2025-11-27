@@ -8,14 +8,64 @@ class SistemaModel:
     
     def obter_perfis_referencia(self):
         """
-        Retorna os dados 'ideais' para cada posição no Polo Aquático.
+        Retorna os dados 'ideais' (Arquétipos Exagerados) para melhor separação no ML.
         """
         perfis = [
-            {"Nome": "REF: Goleiro", "Posicao": "Goleiro", "peso": 92.0, "estatura": 193.0, "flexibilidade": 65.0, "abdominal": 50.0, "arremesso": 6.0, "Salto horizontal": 190.0, "Salto vertical": 55.0},
-            {"Nome": "REF: Lateral", "Posicao": "Lateral", "peso": 82.0, "estatura": 182.0, "flexibilidade": 55.0, "abdominal": 40.0, "arremesso": 6.5, "Salto horizontal": 185.0, "Salto vertical": 45.0},
-            {"Nome": "REF: Zagueiro", "Posicao": "Zagueiro", "peso": 98.0, "estatura": 190.0, "flexibilidade": 70.0, "abdominal": 50.0, "arremesso": 7.5, "Salto horizontal": 195.0, "Salto vertical": 50.0},
-            {"Nome": "REF: Ponta", "Posicao": "Ponta", "peso": 78.0, "estatura": 178.0, "flexibilidade": 60.0, "abdominal": 48.0, "arremesso": 7.0, "Salto horizontal": 180.0, "Salto vertical": 48.0},
-            {"Nome": "REF: Centroavante", "Posicao": "Centroavante", "peso": 105.0, "estatura": 195.0, "flexibilidade": 60.0, "abdominal": 45.0, "arremesso": 8.0, "Salto horizontal": 175.0, "Salto vertical": 52.0}
+            {
+                "Nome": "REF: Goleiro", 
+                "Posicao": "Goleiro", 
+                "peso": 88.0, 
+                "estatura": 198.0, 
+                "flexibilidade": 70.0, 
+                "abdominal": 55.0, 
+                "arremesso": 5.0, # Goleiro foca menos em arremesso forte
+                "Salto horizontal": 180.0, 
+                "Salto vertical": 70.0 # O diferencial do goleiro
+            },
+            {
+                "Nome": "REF: Lateral", 
+                "Posicao": "Lateral", 
+                "peso": 85.0, 
+                "estatura": 185.0, 
+                "flexibilidade": 55.0, 
+                "abdominal": 60.0, # Resistência
+                "arremesso": 7.5, 
+                "Salto horizontal": 210.0, 
+                "Salto vertical": 50.0
+            },
+            {
+                "Nome": "REF: Zagueiro", 
+                "Posicao": "Zagueiro", 
+                "peso": 100.0, # Pesado para marcar
+                "estatura": 192.0, 
+                "flexibilidade": 60.0, 
+                "abdominal": 70.0, # Muito forte no core
+                "arremesso": 8.5, 
+                "Salto horizontal": 190.0, 
+                "Salto vertical": 55.0
+            },
+            {
+                "Nome": "REF: Ponta", 
+                "Posicao": "Ponta", 
+                "peso": 75.0, # Leve e rápido
+                "estatura": 175.0, 
+                "flexibilidade": 65.0, 
+                "abdominal": 50.0, 
+                "arremesso": 7.0, 
+                "Salto horizontal": 230.0, # Explosão horizontal (nado/arranque)
+                "Salto vertical": 45.0
+            },
+            {
+                "Nome": "REF: Centroavante", 
+                "Posicao": "Centroavante", 
+                "peso": 115.0, # O Tanque
+                "estatura": 200.0, 
+                "flexibilidade": 50.0, 
+                "abdominal": 55.0, 
+                "arremesso": 10.0, # O canhão
+                "Salto horizontal": 160.0, 
+                "Salto vertical": 60.0
+            }
         ]
         return pd.DataFrame(perfis)
     

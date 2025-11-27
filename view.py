@@ -204,38 +204,95 @@ class SistemaView:
     def tela_analise_kmeans(self):
         frame = self.frames["analise_kmeans"]
         
-        # Título
-        tk.Label(frame, text="Análise de Perfis (Comparativo com Referência)", bg="#222", fg="white", font=("Arial", 16)).pack(pady=10)
+        # 1. Título (Topo)
+        tk.Label(frame, text="Mapa de Perfis (Clusters)", bg="#222", fg="white", font=("Arial", 16)).pack(side="top", pady=10)
 
-        # Área onde o gráfico vai ficar
-        self.frame_grafico = tk.Frame(frame, bg="white") # Fundo branco pro gráfico
-        self.frame_grafico.pack(pady=10, padx=10, fill="both", expand=True)
-
-        # Botões
-        botoes = tk.Frame(frame, bg="#222")
-        botoes.pack(pady=10)
+        # 2. Botões (Rodapé)
+        # IMPORTANTE: Empacotamos com side="bottom" ANTES do gráfico.
+        # Assim, eles garantem seu lugar no chão da janela.
+        botoes_frame = tk.Frame(frame, bg="#222")
+        botoes_frame.pack(side="bottom", fill="x", pady=15)
         
-        tk.Button(botoes, text="Atualizar Análise", width=15, command=self.exibir_analise_kmeans).pack(side="left", padx=10)
-        tk.Button(botoes, text="Voltar", width=15, command=lambda: self.mostrar_frame("menu_jogadores")).pack(side="left", padx=10)
+        # Centralizando os botões usando um container interno ou pack simples
+        container_botoes = tk.Frame(botoes_frame, bg="#222")
+        container_botoes.pack()
+
+        tk.Button(container_botoes, text="Atualizar Gráfico", width=15, height=2, bg="#ddd",
+                  command=self.exibir_analise_kmeans).pack(side="left", padx=10)
+        
+        tk.Button(container_botoes, text="Voltar", width=15, height=2, bg="#ddd",
+                  command=lambda: self.mostrar_frame("menu_jogadores")).pack(side="left", padx=10)
+
+        # 3. Área do Gráfico (Recheio)
+        # Agora sim, mandamos ele ocupar "o que sobrou" (expand=True)
+        self.frame_grafico = tk.Frame(frame, bg="white") 
+        self.frame_grafico.pack(side="top", fill="both", expand=True, padx=10, pady=5)
 
     def exibir_analise_kmeans(self):
-        # 1. Primeiro, muda para a tela de análise para o usuário ver que algo está acontecendo
+        # 1. Muda para a tela primeiro
         self.mostrar_frame("analise_kmeans")
 
-        # 2. Limpa o gráfico antigo se houver (para não sobrepor)
+        # 2. Limpa gráfico antigo
         for widget in self.frame_grafico.winfo_children():
             widget.destroy()
 
-        # 3. Chama o controller para processar os dados
-        # Se houver erro, 'df_resultado' será None e 'msg' terá o motivo
+        # 3. Chama o Controller
+        # Ele vai rodar o K-Means e o PCA para reduzir a 2 dimensões
         df_resultado, msg = self.controller.gerar_analise_grafica()
 
         if df_resultado is None:
-            # Mostra o erro na tela (ex: "Sem dados suficientes")
-            lbl_erro = tk.Label(self.frame_grafico, text=f"Não foi possível gerar o gráfico:\n{msg}", 
-                                bg="white", fg="red", font=("Arial", 12))
-            lbl_erro.pack(pady=50)
+            tk.Label(self.frame_grafico, text=f"Não foi possível gerar o gráfico:\n{msg}", 
+                     bg="white", fg="red", font=("Arial", 12)).pack(pady=50)
             return
+
+        # --- DESENHANDO COM MATPLOTLIB ---
+        try:
+            # Cria a figura
+            fig, ax = plt.subplots(figsize=(8, 5), dpi=100)
+            
+            # Separa os dados em dois grupos
+            atletas = df_resultado[df_resultado['Tipo'] == 'Atleta']
+            referencias = df_resultado[df_resultado['Tipo'] == 'Referencia']
+
+            # 1. Plota os ATLETAS (Bolinhas coloridas pelos clusters)
+            # O 'c' define a cor baseada no número do cluster que o K-Means definiu
+            scatter = ax.scatter(atletas['PCA1'], atletas['PCA2'], 
+                                 c=atletas['Cluster'], cmap='viridis', 
+                                 s=100, alpha=0.7, edgecolors='black', label='Atletas')
+            
+            # 2. Plota as REFERÊNCIAS (Estrelas Vermelhas Grandes)
+            # Elas servem de "bússola" para sabermos onde fica cada posição
+            ax.scatter(referencias['PCA1'], referencias['PCA2'], 
+                       c='red', marker='*', s=350, edgecolors='black', label='Padrão (Ref)')
+
+            # 3. Adiciona os NOMES nos pontos
+            for i, row in df_resultado.iterrows():
+                x, y = row['PCA1'], row['PCA2']
+                
+                if row['Tipo'] == 'Referencia':
+                    # Nome das posições em destaque
+                    nome_limpo = row['Nome'].replace("REF: ", "")
+                    ax.text(x, y + 0.15, nome_limpo, fontsize=10, fontweight='bold', color='darkred', ha='center')
+                else:
+                    # Nome dos atletas menorzinho
+                    ax.text(x, y + 0.1, row['Nome'], fontsize=8, ha='center', alpha=0.8)
+
+            # Estilização do Gráfico
+            ax.set_title('Distribuição dos Jogadores por Perfil Físico', fontsize=12)
+            ax.set_xlabel('Dimensão 1 (Variação Principal)')
+            ax.set_ylabel('Dimensão 2 (Variação Secundária)')
+            ax.grid(True, linestyle='--', alpha=0.5)
+            
+            # Legenda manual simplificada
+            ax.legend(loc='upper right')
+
+            # Empacota no Tkinter
+            canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill="both", expand=True)
+            
+        except Exception as e:
+            tk.Label(self.frame_grafico, text=f"Erro ao desenhar: {e}", fg="red").pack()
         
     # -------- Lógica de Seleção --------
     def selecionar_jogador_da_lista(self):
