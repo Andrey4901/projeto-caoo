@@ -6,6 +6,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from datetime import datetime
 
+from elo1 import Elo_01
+from elo2 import Elo_02
+from elo3 import Elo_03
+from elo4 import Elo_04
+
 class Controller:
     def __init__(self):
         self.model = SistemaModel()
@@ -89,6 +94,9 @@ class Controller:
             return "sucesso"
         except ValueError:
             return "erro_numerico"
+        
+    def excluir_jogador(self, nome):
+        return self.model.excluir_jogador(nome)
 
     def listar_jogadores(self):
         jogadores = self.model.listar_jogadores()
@@ -119,95 +127,95 @@ class Controller:
 
     # -------- Machine Learning e Gráfico --------
     def gerar_analise_grafica(self):
-        # 1. Pega dados
+        # 1. Obter dados
         df_jogadores = self.model.obter_dados_para_ml()
         if df_jogadores is None or df_jogadores.empty:
             return None, "Sem dados de jogadores suficientes."
 
-        # 2. Pega dados de referência
         df_ref = self.model.obter_perfis_referencia()
 
-        # 3. Junta tudo
+        # Identificadores
         df_jogadores['Tipo'] = 'Atleta'
         df_ref['Tipo'] = 'Referencia'
         
+        # Junta tudo para criar a escala correta
         cols_comuns = ['Nome', 'peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical', 'Tipo']
         df_completo = pd.concat([df_jogadores, df_ref], ignore_index=True)
         df_completo = df_completo[cols_comuns]
 
-        # 4. K-Means
+        # 2. Prepara os dados matemáticos (Normalização)
         features = ['peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical']
-        X = df_completo[features]
+        X = df_completo[features].fillna(0) # Garante que não tem buracos
+        
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        kmeans = KMeans(n_clusters=5, n_init=10, random_state=42)
-        clusters = kmeans.fit_predict(X_scaled)
+        # 3. Lógica de "Imã": Conectar atletas à Referência mais próxima
+        # Separa os dados normalizados de volta
+        n_jogadores = len(df_jogadores)
+        X_jogadores = X_scaled[:n_jogadores]
+        X_ref = X_scaled[n_jogadores:] # As últimas linhas são as referências
+
+        clusters = []
+        # Para cada jogador, descobre qual referência é a mais próxima (Menor Distância Euclidiana)
+        for i in range(len(X_jogadores)):
+            jogador = X_jogadores[i]
+            distancias = np.linalg.norm(X_ref - jogador, axis=1) # Calcula distancia para todas as 5 refs
+            cluster_id = np.argmin(distancias) # Pega o índice da menor distância (0 a 4)
+            clusters.append(cluster_id)
+        
+        # Para as referências, o cluster é elas mesmas (0, 1, 2, 3, 4)
+        for i in range(len(X_ref)):
+            clusters.append(i)
+
         df_completo['Cluster'] = clusters
 
-        # 5. PCA
+        # 4. Gera o Gráfico 2D (PCA)
         pca = PCA(n_components=2)
         X_pca = pca.fit_transform(X_scaled)
         
         df_completo['PCA1'] = X_pca[:, 0]
         df_completo['PCA2'] = X_pca[:, 1]
 
-        return df_completo, "sucesso"
+        # 5. Mapeia nomes das posições para usar na legenda
+        # Cria um dicionário {0: 'Goleiro', 1: 'Lateral'...}
+        mapa_nomes = {}
+        for idx, row in df_ref.iterrows():
+            # Como as refs estão no final, usamos a ordem delas para definir os IDs
+            mapa_nomes[idx] = row['Posicao']
+            
+        return {
+            'df': df_completo,
+            'mapa_nomes': mapa_nomes
+        }, "sucesso"
 
     # -------- Lógica de Detalhes e Predição --------
     def obter_detalhes_e_predicao(self, valores_treeview):
-        try:
-            # 1. Converter dados da View (Strings) para Números e Dicionário
-            atleta = {
-                "Nome": valores_treeview[0],
-                "Data nasc": valores_treeview[1],
-                "peso": float(valores_treeview[2]) if valores_treeview[2] != 'None' and valores_treeview[2] != '-' else 0,
-                "estatura": float(valores_treeview[3]) if valores_treeview[3] != 'None' and valores_treeview[3] != '-' else 0,
-                "flexibilidade": float(valores_treeview[4]) if valores_treeview[4] != 'None' and valores_treeview[4] != '-' else 0,
-                "abdominal": float(valores_treeview[5]) if valores_treeview[5] != 'None' and valores_treeview[5] != '-' else 0,
-                "arremesso": float(valores_treeview[6]) if valores_treeview[6] != 'None' and valores_treeview[6] != '-' else 0,
-                "Salto horizontal": float(valores_treeview[7]) if valores_treeview[7] != 'None' and valores_treeview[7] != '-' else 0,
-                "Salto vertical": float(valores_treeview[8]) if valores_treeview[8] != 'None' and valores_treeview[8] != '-' else 0,
-            }
-            
-            # Adiciona a idade
-            idade = self._calcular_idade(atleta["Data nasc"])
-            atleta["Data_formatada"] = f"{atleta['Data nasc']} ({idade} anos)"
+        """
+        Processa os dados usando o padrão Chain of Responsibility (Elos).
+        """
+        # 1. Instancia os Elos, passando o model (necessário para o Elo 4)
+        elo1 = Elo_01(self.model)
+        elo2 = Elo_02(self.model)
+        elo3 = Elo_03(self.model)
+        elo4 = Elo_04(self.model)
 
-        except ValueError:
-            return None, "Erro ao converter dados numéricos."
+        # 2. Encadeia (Elo 1 -> Elo 2 -> Elo 3 -> Elo 4)
+        elo1.set_next(elo2)
+        elo2.set_next(elo3)
+        elo3.set_next(elo4)
 
-        # 2. Obter as referências
-        df_ref = self.model.obter_perfis_referencia()
-        
-        # 3. Descobrir qual posição é a mais próxima
-        menor_distancia = float('inf')
-        melhor_posicao = "Indefinido"
-        
-        atributos = ['peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical']
-        
-        valores_atleta = np.array([atleta[k] for k in atributos])
-        maximos = np.array([130.0, 210.0, 100.0, 100.0, 30.0, 250.0, 100.0]) 
-        atleta_norm = valores_atleta / maximos
+        # 3. Roda a esteira!
+        # Passamos a lista bruta e recebemos o pacote completo processado
+        resultado_final = elo1.run(valores_treeview)
 
-        for index, row in df_ref.iterrows():
-            valores_ref = np.array([row[k] for k in atributos])
-            ref_norm = valores_ref / maximos
-            distancia = np.linalg.norm(atleta_norm - ref_norm)
-            
-            if distancia < menor_distancia:
-                menor_distancia = distancia
-                melhor_posicao = row['Posicao']
+        if resultado_final is None:
+            return None, "Erro no processamento dos elos."
 
-        # 4. Preparar dados para o Gráfico
-        dados_grafico = {
-            "labels": ["Peso", "Estatura", "Flex.", "Abd.", "Arremesso", "S. Horiz.", "S. Vert."],
-            "values_atleta": list(atleta_norm),
-            "values_original": list(valores_atleta)
-        }
-
+        # 4. Formata o retorno para a View
+        # A View espera: dicionário com chaves específicas
         return {
-            "atleta": atleta,
-            "melhor_posicao": melhor_posicao,
-            "dados_grafico": dados_grafico
+            "atleta": resultado_final, # O dict já contém Nome, Data, etc.
+            "melhor_posicao": resultado_final['melhor_posicao'],
+            "dados_grafico": resultado_final['dados_grafico']
         }, "sucesso"

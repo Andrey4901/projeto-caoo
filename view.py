@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import numpy as np
 
 class SistemaView:
@@ -139,9 +139,41 @@ class SistemaView:
             
         elif resultado == "erro_numerico":
             messagebox.showerror("Erro nos Valores", "Verifique se os campos de medidas contêm apenas números.\nUse ponto (.) para decimais.")
+
+    def remover_jogador_selecionado(self):
+        # 1. Verifica se tem alguém selecionado
+        item_selecionado = self.tree_lista.selection()
+        
+        if not item_selecionado:
+            messagebox.showwarning("Atenção", "Selecione um jogador na lista para remover.")
+            return
+
+        # 2. Pega o nome do jogador (primeira coluna)
+        valores = self.tree_lista.item(item_selecionado, "values")
+        nome_alvo = valores[0] 
+
+        # 3. Pede confirmação (Segurança)
+        resposta = messagebox.askyesno("Confirmar Exclusão", 
+                                       f"Tem certeza que deseja apagar '{nome_alvo}' permanentemente?\nEssa ação não pode ser desfeita.")
+        
+        if resposta:
+            # 4. Chama o controller para apagar do MongoDB
+            sucesso = self.controller.excluir_jogador(nome_alvo)
+            
+            if sucesso:
+                messagebox.showinfo("Sucesso", f"O registro de '{nome_alvo}' foi apagado.")
+                # 5. Atualiza a lista na hora
+                self.exibir_lista_jogadores()
+            else:
+                messagebox.showerror("Erro", "Não foi possível remover o jogador do banco de dados.")
     
     def tela_listar_jogadores(self):
         frame = self.frames["listar_jogadores"]
+        
+        # Limpa o frame antes de recriar (para evitar duplicar botões se voltar na tela)
+        for widget in frame.winfo_children():
+            widget.destroy()
+
         tk.Label(frame, text="Base de Dados de Jogadores", bg="#222", fg="white", font=("Arial", 16)).pack(pady=10)
 
         # Frame para a tabela
@@ -163,7 +195,11 @@ class SistemaView:
         tk.Button(botoes_frame, text="Voltar", width=12, 
                   command=lambda: self.mostrar_frame("menu_jogadores")).pack(side="left", padx=10)
         
-        # Botão Selecionar (Novo!)
+        # Botão Remover (Vermelho) - NOVO!
+        tk.Button(botoes_frame, text="Remover", width=12, bg="#d9534f", fg="white",
+                  command=self.remover_jogador_selecionado).pack(side="left", padx=10)
+
+        # Botão Selecionar (Verde)
         tk.Button(botoes_frame, text="Selecionar", width=12, bg="#4CAF50", fg="white",
                   command=self.selecionar_jogador_da_lista).pack(side="left", padx=10)
 
@@ -229,70 +265,82 @@ class SistemaView:
         self.frame_grafico.pack(side="top", fill="both", expand=True, padx=10, pady=5)
 
     def exibir_analise_kmeans(self):
-        # 1. Muda para a tela primeiro
+        # 1. Muda tela e limpa
         self.mostrar_frame("analise_kmeans")
-
-        # 2. Limpa gráfico antigo
+        
+        # Limpa TUDO que tem dentro do frame do gráfico (gráfico antigo e barra de ferramentas antiga)
         for widget in self.frame_grafico.winfo_children():
             widget.destroy()
 
-        # 3. Chama o Controller
-        # Ele vai rodar o K-Means e o PCA para reduzir a 2 dimensões
-        df_resultado, msg = self.controller.gerar_analise_grafica()
+        # 2. Chama Controller
+        resultado, msg = self.controller.gerar_analise_grafica()
 
-        if df_resultado is None:
-            tk.Label(self.frame_grafico, text=f"Não foi possível gerar o gráfico:\n{msg}", 
-                     bg="white", fg="red", font=("Arial", 12)).pack(pady=50)
+        if resultado is None:
+            tk.Label(self.frame_grafico, text=f"Erro: {msg}", bg="white", fg="red").pack(pady=50)
             return
 
-        # --- DESENHANDO COM MATPLOTLIB ---
+        df = resultado['df']
+        mapa_nomes = resultado['mapa_nomes']
+
         try:
-            # Cria a figura
-            fig, ax = plt.subplots(figsize=(8, 5), dpi=100)
+            fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
             
-            # Separa os dados em dois grupos
-            atletas = df_resultado[df_resultado['Tipo'] == 'Atleta']
-            referencias = df_resultado[df_resultado['Tipo'] == 'Referencia']
-
-            # 1. Plota os ATLETAS (Bolinhas coloridas pelos clusters)
-            # O 'c' define a cor baseada no número do cluster que o K-Means definiu
-            scatter = ax.scatter(atletas['PCA1'], atletas['PCA2'], 
-                                 c=atletas['Cluster'], cmap='viridis', 
-                                 s=100, alpha=0.7, edgecolors='black', label='Atletas')
+            cores = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00'] 
             
-            # 2. Plota as REFERÊNCIAS (Estrelas Vermelhas Grandes)
-            # Elas servem de "bússola" para sabermos onde fica cada posição
-            ax.scatter(referencias['PCA1'], referencias['PCA2'], 
-                       c='red', marker='*', s=350, edgecolors='black', label='Padrão (Ref)')
+            atletas = df[df['Tipo'] == 'Atleta']
+            referencias = df[df['Tipo'] == 'Referencia']
 
-            # 3. Adiciona os NOMES nos pontos
-            for i, row in df_resultado.iterrows():
-                x, y = row['PCA1'], row['PCA2']
-                
-                if row['Tipo'] == 'Referencia':
-                    # Nome das posições em destaque
-                    nome_limpo = row['Nome'].replace("REF: ", "")
-                    ax.text(x, y + 0.15, nome_limpo, fontsize=10, fontweight='bold', color='darkred', ha='center')
-                else:
-                    # Nome dos atletas menorzinho
-                    ax.text(x, y + 0.1, row['Nome'], fontsize=8, ha='center', alpha=0.8)
+            # --- DESENHO (Mesma lógica de antes) ---
+            for i, atleta in atletas.iterrows():
+                cluster_id = int(atleta['Cluster'])
+                ref = referencias[referencias['Cluster'] == cluster_id].iloc[0]
+                ax.plot([atleta['PCA1'], ref['PCA1']], 
+                        [atleta['PCA2'], ref['PCA2']], 
+                        c=cores[cluster_id], alpha=0.2, linestyle='-', zorder=1)
 
-            # Estilização do Gráfico
-            ax.set_title('Distribuição dos Jogadores por Perfil Físico', fontsize=12)
-            ax.set_xlabel('Dimensão 1 (Variação Principal)')
-            ax.set_ylabel('Dimensão 2 (Variação Secundária)')
-            ax.grid(True, linestyle='--', alpha=0.5)
+            for cluster_id in range(5):
+                grupo = atletas[atletas['Cluster'] == cluster_id]
+                ax.scatter(grupo['PCA1'], grupo['PCA2'], 
+                           color=cores[cluster_id], s=80, alpha=0.8, 
+                           edgecolors='white', linewidth=1, zorder=2)
+
+            for cluster_id in range(5):
+                grupo_ref = referencias[referencias['Cluster'] == cluster_id]
+                nome_posicao = mapa_nomes.get(cluster_id, "Ref")
+                ax.scatter(grupo_ref['PCA1'], grupo_ref['PCA2'], 
+                           color=cores[cluster_id], s=400, marker='*', 
+                           edgecolors='black', linewidth=1.5, zorder=3, label=nome_posicao)
+                ax.text(grupo_ref['PCA1'].values[0], grupo_ref['PCA2'].values[0] + 0.3, 
+                        nome_posicao.upper(), fontsize=10, fontweight='bold', 
+                        color=cores[cluster_id], ha='center', zorder=4,
+                        bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+
+            for i, row in atletas.iterrows():
+                ax.text(row['PCA1'], row['PCA2'] - 0.15, row['Nome'], 
+                        fontsize=7, ha='center', va='top', alpha=0.7, zorder=4)
+
+            ax.set_title('Mapa de Clustering (Atletas agrupados por similaridade)', fontsize=14)
+            ax.grid(True, linestyle=':', alpha=0.4)
+            ax.set_xticks([]) 
+            ax.set_yticks([])
+            ax.legend(loc='lower right', title="Grupos", fontsize=8, framealpha=0.9)
+
+            # --- PARTE NOVA: Canvas e BARRA DE FERRAMENTAS ---
             
-            # Legenda manual simplificada
-            ax.legend(loc='upper right')
-
-            # Empacota no Tkinter
+            # 1. Cria a área de desenho
             canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
             canvas.draw()
+            
+            # 2. Cria a Barra de Ferramentas (Zoom, Pan, Save)
+            # Ela se conecta automaticamente ao canvas
+            toolbar = NavigationToolbar2Tk(canvas, self.frame_grafico)
+            toolbar.update()
+            
+            # 3. Empacota tudo
             canvas.get_tk_widget().pack(fill="both", expand=True)
             
         except Exception as e:
-            tk.Label(self.frame_grafico, text=f"Erro ao desenhar: {e}", fg="red").pack()
+            tk.Label(self.frame_grafico, text=f"Erro visual: {e}", fg="red").pack()
         
     # -------- Lógica de Seleção --------
     def selecionar_jogador_da_lista(self):
