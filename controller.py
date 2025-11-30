@@ -127,61 +127,65 @@ class Controller:
 
     # -------- Machine Learning e Gráfico --------
     def gerar_analise_grafica(self):
-        # 1. Obter dados
+        # 1. Pega dados do banco
         df_jogadores = self.model.obter_dados_para_ml()
+        
         if df_jogadores is None or df_jogadores.empty:
             return None, "Sem dados de jogadores suficientes."
 
-        df_ref = self.model.obter_perfis_referencia()
+        # === NOVO FILTRO DE QUALIDADE ===
+        # Lista de colunas físicas
+        features = ['peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical']
+        
+        # Cria uma máscara booleana: Onde for 0 vira True, onde tiver valor vira False
+        # Depois somamos quantos True existem por linha (axis=1)
+        contagem_zeros = (df_jogadores[features] == 0).sum(axis=1)
+        
+        # Filtra: Mantém apenas atletas com MENOS de 3 zeros
+        # Quem tiver 3, 4, 5... zeros será ignorado neste gráfico
+        df_jogadores = df_jogadores[contagem_zeros < 3]
 
-        # Identificadores
+        if df_jogadores.empty:
+            return None, "Todos os atletas foram filtrados (dados incompletos)."
+        # ================================
+
+        df_ref = self.model.obter_perfis_referencia()
         df_jogadores['Tipo'] = 'Atleta'
         df_ref['Tipo'] = 'Referencia'
         
-        # Junta tudo para criar a escala correta
+        # Junta tudo
         cols_comuns = ['Nome', 'peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical', 'Tipo']
         df_completo = pd.concat([df_jogadores, df_ref], ignore_index=True)
         df_completo = df_completo[cols_comuns]
 
-        # 2. Prepara os dados matemáticos (Normalização)
-        features = ['peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical']
-        X = df_completo[features].fillna(0) # Garante que não tem buracos
-        
+        # Prepara matemática
+        X = df_completo[features].fillna(0)
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        # 3. Lógica de "Imã": Conectar atletas à Referência mais próxima
-        # Separa os dados normalizados de volta
-        n_jogadores = len(df_jogadores)
-        X_jogadores = X_scaled[:n_jogadores]
-        X_ref = X_scaled[n_jogadores:] # As últimas linhas são as referências
-
+        # Lógica de Imã (Cluster forçado pela distância)
+        n_jog = len(df_jogadores)
         clusters = []
-        # Para cada jogador, descobre qual referência é a mais próxima (Menor Distância Euclidiana)
-        for i in range(len(X_jogadores)):
-            jogador = X_jogadores[i]
-            distancias = np.linalg.norm(X_ref - jogador, axis=1) # Calcula distancia para todas as 5 refs
-            cluster_id = np.argmin(distancias) # Pega o índice da menor distância (0 a 4)
-            clusters.append(cluster_id)
+        X_jog = X_scaled[:n_jog]
+        X_ref = X_scaled[n_jog:]
         
-        # Para as referências, o cluster é elas mesmas (0, 1, 2, 3, 4)
+        for j in X_jog:
+            clusters.append(np.argmin(np.linalg.norm(X_ref - j, axis=1)))
+        
         for i in range(len(X_ref)):
             clusters.append(i)
 
         df_completo['Cluster'] = clusters
 
-        # 4. Gera o Gráfico 2D (PCA)
+        # PCA (Redução de dimensão para 2D)
         pca = PCA(n_components=2)
         X_pca = pca.fit_transform(X_scaled)
         
         df_completo['PCA1'] = X_pca[:, 0]
         df_completo['PCA2'] = X_pca[:, 1]
 
-        # 5. Mapeia nomes das posições para usar na legenda
-        # Cria um dicionário {0: 'Goleiro', 1: 'Lateral'...}
         mapa_nomes = {}
         for idx, row in df_ref.iterrows():
-            # Como as refs estão no final, usamos a ordem delas para definir os IDs
             mapa_nomes[idx] = row['Posicao']
             
         return {
