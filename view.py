@@ -14,6 +14,7 @@ class SistemaView:
         self.root.title("Sistema de Análise de Atletas")
         self.root.geometry("800x600")
         self.root.configure(bg="#222")
+        self.root.protocol("WM_DELETE_WINDOW", self.fechar_sistema)
 
         # Define os frames que AINDA vamos usar
         self.frames = {}
@@ -30,6 +31,15 @@ class SistemaView:
         self.tela_detalhes_jogador() # <--- Adicione a chamada para criar a nova tela vazia
 
         self.mostrar_frame("menu_jogadores")
+
+    def fechar_sistema(self):
+        """Fecha a janela e mata o processo Python para evitar travamento no VS Code."""
+        try:
+            self.root.quit()    # Para o mainloop
+            self.root.destroy() # Destroi a janela
+            print("Sistema encerrado corretamente.")
+        except Exception:
+            pass
 
     def mostrar_frame(self, nome):
         self.frames[nome].tkraise()
@@ -53,7 +63,7 @@ class SistemaView:
                   command=self.exibir_analise_kmeans).pack(side="left", padx=10)
 
         tk.Button(botoes_frame, text="Sair", width=20,
-                  command=self.root.destroy).pack(pady=20)
+                  command=self.fechar_sistema).pack(pady=20)
         
     def tela_cadastro_jogador(self):
         frame = self.frames["cadastro_jogador"]
