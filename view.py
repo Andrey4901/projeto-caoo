@@ -275,82 +275,85 @@ class SistemaView:
         self.frame_grafico.pack(side="top", fill="both", expand=True, padx=10, pady=5)
 
     def exibir_analise_kmeans(self):
-        # 1. Muda tela e limpa
         self.mostrar_frame("analise_kmeans")
         
-        # Limpa TUDO que tem dentro do frame do gráfico (gráfico antigo e barra de ferramentas antiga)
-        for widget in self.frame_grafico.winfo_children():
-            widget.destroy()
+        # Limpa o gráfico antigo
+        for w in self.frame_grafico.winfo_children(): w.destroy()
 
-        # 2. Chama Controller
-        resultado, msg = self.controller.gerar_analise_grafica()
+        res, msg = self.controller.gerar_analise_grafica()
+        if res is None: 
+            return tk.Label(self.frame_grafico, text=f"Erro: {msg}", bg="white", fg="red").pack(pady=50)
 
-        if resultado is None:
-            tk.Label(self.frame_grafico, text=f"Erro: {msg}", bg="white", fg="red").pack(pady=50)
-            return
-
-        df = resultado['df']
-        mapa_nomes = resultado['mapa_nomes']
+        df, mapa = res['df'], res['mapa_nomes']
 
         try:
             fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
             
-            cores = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00'] 
+            # Cores vibrantes e distintas
+            cores = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00']
             
-            atletas = df[df['Tipo'] == 'Atleta']
-            referencias = df[df['Tipo'] == 'Referencia']
+            at = df[df['Tipo'] == 'Atleta']
+            ref = df[df['Tipo'] == 'Referencia']
 
-            # --- DESENHO (Mesma lógica de antes) ---
-            for i, atleta in atletas.iterrows():
-                cluster_id = int(atleta['Cluster'])
-                ref = referencias[referencias['Cluster'] == cluster_id].iloc[0]
-                ax.plot([atleta['PCA1'], ref['PCA1']], 
-                        [atleta['PCA2'], ref['PCA2']], 
-                        c=cores[cluster_id], alpha=0.2, linestyle='-', zorder=1)
+            # 1. LINHAS DE CONEXÃO (Bem sutis)
+            for i, row in at.iterrows():
+                cid = int(row['Cluster'])
+                r = ref[ref['Cluster'] == cid].iloc[0]
+                ax.plot([row['PCA1'], r['PCA1']], [row['PCA2'], r['PCA2']], 
+                        c=cores[cid], alpha=0.1, linestyle='-', linewidth=0.5, zorder=1)
 
-            for cluster_id in range(5):
-                grupo = atletas[atletas['Cluster'] == cluster_id]
-                ax.scatter(grupo['PCA1'], grupo['PCA2'], 
-                           color=cores[cluster_id], s=80, alpha=0.8, 
-                           edgecolors='white', linewidth=1, zorder=2)
+            # 2. ATLETAS (Bolinhas)
+            for cid in range(5):
+                grp = at[at['Cluster'] == cid]
+                ax.scatter(grp['PCA1'], grp['PCA2'], 
+                           color=cores[cid], s=60, alpha=0.7, edgecolors='white', linewidth=0.5, zorder=2)
 
-            for cluster_id in range(5):
-                grupo_ref = referencias[referencias['Cluster'] == cluster_id]
-                nome_posicao = mapa_nomes.get(cluster_id, "Ref")
-                ax.scatter(grupo_ref['PCA1'], grupo_ref['PCA2'], 
-                           color=cores[cluster_id], s=400, marker='*', 
-                           edgecolors='black', linewidth=1.5, zorder=3, label=nome_posicao)
-                ax.text(grupo_ref['PCA1'].values[0], grupo_ref['PCA2'].values[0] + 0.3, 
-                        nome_posicao.upper(), fontsize=10, fontweight='bold', 
-                        color=cores[cluster_id], ha='center', zorder=4,
-                        bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+            # 3. REFERÊNCIAS (Estrelas) - SEM TEXTO GIGANTE AGORA
+            for cid in range(5):
+                rf = ref[ref['Cluster'] == cid]
+                nm = mapa.get(cid, "Ref")
+                
+                # Apenas a estrela. O 'label=nm' garante que apareça na legenda.
+                ax.scatter(rf['PCA1'], rf['PCA2'], 
+                           color=cores[cid], s=500, marker='*', edgecolors='black', linewidth=1.5, zorder=3, label=nm)
+                
+                # REMOVIDO: ax.text(...) que colocava o nome GIGANTE no meio do gráfico.
 
-            for i, row in atletas.iterrows():
-                ax.text(row['PCA1'], row['PCA2'] - 0.15, row['Nome'], 
-                        fontsize=7, ha='center', va='top', alpha=0.7, zorder=4)
+            # 4. NOMES DOS ATLETAS (Discretos)
+            import random
+            for i, row in at.iterrows():
+                # Pequeno ajuste aleatório para nomes não ficarem um em cima do outro
+                jitter_y = random.uniform(-0.03, 0.03)
+                jitter_x = random.uniform(-0.03, 0.03)
+                
+                ax.text(row['PCA1'] + jitter_x, row['PCA2'] - 0.1 + jitter_y, 
+                        row['Nome'], fontsize=6, ha='center', alpha=0.6, zorder=4)
 
-            ax.set_title('Mapa de Clustering (Atletas agrupados por similaridade)', fontsize=14)
-            ax.grid(True, linestyle=':', alpha=0.4)
-            ax.set_xticks([]) 
+            # Ajustes Finais de Layout
+            ax.set_title('Mapa de Clustering (Distribuição dos Atletas)', fontsize=14)
+            ax.set_xticks([])
             ax.set_yticks([])
-            ax.legend(loc='lower right', title="Grupos", fontsize=8, framealpha=0.9)
-
-            # --- PARTE NOVA: Canvas e BARRA DE FERRAMENTAS ---
+            ax.grid(False) # Sem grades para ficar clean
             
-            # 1. Cria a área de desenho
+            # Borda do gráfico mais suave
+            for spine in ax.spines.values():
+                spine.set_edgecolor('#ddd')
+
+            # LEGENDA (Agora ela é a protagonista da identificação)
+            # bbox_to_anchor joga a legenda um pouco para fora se precisar, ou mantém no canto
+            ax.legend(loc='lower right', title="Perfis (Referências)", fontsize=9, framealpha=0.9, fancybox=True)
+
             canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
             canvas.draw()
             
-            # 2. Cria a Barra de Ferramentas (Zoom, Pan, Save)
-            # Ela se conecta automaticamente ao canvas
+            # Barra de ferramentas
             toolbar = NavigationToolbar2Tk(canvas, self.frame_grafico)
             toolbar.update()
             
-            # 3. Empacota tudo
             canvas.get_tk_widget().pack(fill="both", expand=True)
             
-        except Exception as e:
-            tk.Label(self.frame_grafico, text=f"Erro visual: {e}", fg="red").pack()
+        except Exception as e: 
+            tk.Label(self.frame_grafico, text=f"Erro: {e}", fg="red").pack()
         
     # -------- Lógica de Seleção --------
     def selecionar_jogador_da_lista(self):

@@ -127,59 +127,62 @@ class Controller:
 
     # -------- Machine Learning e Gráfico --------
     def gerar_analise_grafica(self):
-        # 1. Pega dados do banco
+        # 1. Obter dados
         df_jogadores = self.model.obter_dados_para_ml()
-        
         if df_jogadores is None or df_jogadores.empty:
             return None, "Sem dados de jogadores suficientes."
 
-        # === NOVO FILTRO DE QUALIDADE ===
-        # Lista de colunas físicas
+        # 2. FILTRO DE QUALIDADE
         features = ['peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical']
-        
-        # Cria uma máscara booleana: Onde for 0 vira True, onde tiver valor vira False
-        # Depois somamos quantos True existem por linha (axis=1)
         contagem_zeros = (df_jogadores[features] == 0).sum(axis=1)
-        
-        # Filtra: Mantém apenas atletas com MENOS de 3 zeros
-        # Quem tiver 3, 4, 5... zeros será ignorado neste gráfico
         df_jogadores = df_jogadores[contagem_zeros < 3]
 
         if df_jogadores.empty:
             return None, "Todos os atletas foram filtrados (dados incompletos)."
-        # ================================
 
+        # 3. Preparação dos Dados
         df_ref = self.model.obter_perfis_referencia()
         df_jogadores['Tipo'] = 'Atleta'
         df_ref['Tipo'] = 'Referencia'
         
-        # Junta tudo
         cols_comuns = ['Nome', 'peso', 'estatura', 'flexibilidade', 'abdominal', 'arremesso', 'Salto horizontal', 'Salto vertical', 'Tipo']
         df_completo = pd.concat([df_jogadores, df_ref], ignore_index=True)
         df_completo = df_completo[cols_comuns]
 
-        # Prepara matemática
-        X = df_completo[features].fillna(0)
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        # Pegamos os dados brutos numéricos
+        X_bruto = df_completo[features].fillna(0).values
 
-        # Lógica de Imã (Cluster forçado pela distância)
+        # --- PASSO A: LÓGICA DE CLASSIFICAÇÃO (Quem conecta com quem?) ---
+        # Aqui usamos a RÉGUA FIXA (Absoluta).
+        # Isso garante que o Diogo (116kg) seja matematicamente puxado para o Centroavante.
+        maximos = np.array([130.0, 210.0, 100.0, 100.0, 30.0, 250.0, 100.0])
+        X_logica = X_bruto / maximos
+
         n_jog = len(df_jogadores)
         clusters = []
-        X_jog = X_scaled[:n_jog]
-        X_ref = X_scaled[n_jog:]
         
-        for j in X_jog:
-            clusters.append(np.argmin(np.linalg.norm(X_ref - j, axis=1)))
+        # Separa para cálculo de distância
+        X_jog_logica = X_logica[:n_jog]
+        X_ref_logica = X_logica[n_jog:]
         
-        for i in range(len(X_ref)):
+        for j in X_jog_logica:
+            distancias = np.linalg.norm(X_ref_logica - j, axis=1)
+            clusters.append(np.argmin(distancias)) # Define a cor/grupo correto
+        
+        for i in range(len(X_ref_logica)):
             clusters.append(i)
 
         df_completo['Cluster'] = clusters
 
-        # PCA (Redução de dimensão para 2D)
+        # --- PASSO B: VISUALIZAÇÃO (Onde o ponto aparece?) ---
+        # Aqui usamos a RÉGUA RELATIVA (StandardScaler).
+        # Ela é muito melhor para o PCA desenhar gráficos bonitos e espalhados,
+        # como na imagem que você gostou.
+        scaler_visual = StandardScaler()
+        X_visual = scaler_visual.fit_transform(X_bruto)
+
         pca = PCA(n_components=2)
-        X_pca = pca.fit_transform(X_scaled)
+        X_pca = pca.fit_transform(X_visual) 
         
         df_completo['PCA1'] = X_pca[:, 0]
         df_completo['PCA2'] = X_pca[:, 1]
@@ -188,10 +191,7 @@ class Controller:
         for idx, row in df_ref.iterrows():
             mapa_nomes[idx] = row['Posicao']
             
-        return {
-            'df': df_completo,
-            'mapa_nomes': mapa_nomes
-        }, "sucesso"
+        return {'df': df_completo, 'mapa_nomes': mapa_nomes}, "sucesso"
 
     # -------- Lógica de Detalhes e Predição --------
     def obter_detalhes_e_predicao(self, valores_treeview):
